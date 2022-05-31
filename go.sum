@@ -1,2 +1,4 @@
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/ntop001/phx2 v0.0.0-20220530064745-63954c02ffff h1:zRee/OBMLQm0bYMXf/2JLIIDTnZiNzlkMssKS9VFmQg=
+github.com/ntop001/phx2 v0.0.0-20220530064745-63954c02ffff/go.mod h1:mep5HUukPmW1cHa5xYzAbE0Bn4FLhIU/qj4LAF32UYo=
