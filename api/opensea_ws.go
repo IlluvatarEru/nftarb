@@ -23,7 +23,18 @@ func GetOpenSeaWSHost(live bool) string {
 		return "testnets-stream.openseabeta.com"
 	}
 }
-
+func StartSimpleExample() {
+	// Create a url.URL to connect to. `ws://` is non-encrypted websocket.
+	urlStr := "wss://testnets-stream.openseabeta.com/socket?token=ae36b1b4131c421e8c84088ad48abe9b&vsn=2.0.0"
+	endPoint, _ := url.Parse(urlStr)
+	log.Println("Connecting to", endPoint)
+	c, resp, err := websocket.DefaultDialer.Dial(urlStr, nil)
+	if err != nil {
+		log.Printf("handshake failed with status %d", resp.StatusCode)
+		log.Fatal("dial:", err)
+	}
+	_ = c
+}
 func StartWSConnection(live bool) {
 	openSeaHost := GetOpenSeaWSHost(live)
 	openSeaPath := "/socket/websocket"

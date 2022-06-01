@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -20,6 +21,7 @@ type LooksRareOrder struct {
 }
 
 func GetLooksRareBestBid(address string) (*LooksRareOrder, error) {
+	fmt.Println(address)
 	resp, err := http.Get("https://api.looksrare.org/api/v1/orders?tokenId=0&isOrderAsk=false&status%5B%5D=VALID&sort=PRICE_ASC&collection=" + address)
 	if err != nil {
 		log.Fatalln(err)
@@ -31,6 +33,10 @@ func GetLooksRareBestBid(address string) (*LooksRareOrder, error) {
 	}
 	looksRareResponse := new(LooksRareOrdersResponse)
 	json.Unmarshal(body, looksRareResponse)
-
-	return &looksRareResponse.Data[0], nil
+	if len(looksRareResponse.Data) > 0 {
+		return &looksRareResponse.Data[0], nil
+	} else {
+		fmt.Println("No bid on Looks rare")
+		return nil, nil
+	}
 }

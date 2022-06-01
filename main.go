@@ -3,12 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
 	"nftarb/api"
 	"strconv"
-
-	"github.com/gorilla/websocket"
+	"time"
 )
 
 func getPriceFloat(price string) float64 {
@@ -27,58 +24,75 @@ func detectArbitrage(bid api.LooksRareOrder, floorPrice float64) {
 	}
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+type Collection struct {
+	Name       string
+	Address    string
+	FloorPrice float64
 }
 
-func wsEndpoint(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-
-	// upgrade this connection to a WebSocket
-	// connection
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
+func AddCollections(collectionNames []string, collections []Collection) []Collection {
+	for _, collectionName := range collectionNames {
+		address, _ := api.GetOpenSeaCollectionAddress(collectionName)
+		floorPrice, _ := api.GetOpenSeaFloor(collectionName)
+		collection := Collection{
+			Name:       collectionName,
+			Address:    address,
+			FloorPrice: floorPrice,
+		}
+		collections = append(collections, collection)
 	}
-
-	log.Println("Client Connected")
-	err = ws.WriteMessage(1, []byte("Hi Client!"))
-	if err != nil {
-		log.Println(err)
-	}
-	// listen indefinitely for new messages coming
-	// through on our WebSocket connection
-	reader(ws)
+	return collections
 }
 
-func reader(conn *websocket.Conn) {
+func PrintCollections(collections []Collection) {
+	for _, collection := range collections {
+		PrintCollection(collection)
+	}
+}
+
+func PrintCollection(collection Collection) {
+	fmt.Println("--------------------")
+	fmt.Println(collection.Name)
+	fmt.Println(collection.Address)
+	fmt.Println(collection.FloorPrice)
+	fmt.Println("--------------------")
+}
+
+func (collection *Collection) MonitorAndUpdateFloorPrice(checks chan string) {
 	for {
-		// read in a message
-		messageType, p, err := conn.ReadMessage()
+		floorPrice, err := api.GetOpenSeaFloor(collection.Name)
+		if floorPrice != collection.FloorPrice {
+			fmt.Println("Floor Price Update for", collection.Name)
+			fmt.Println("Previous Floor price", collection.FloorPrice)
+			fmt.Println("New Floor price", floorPrice)
+			collection.FloorPrice = floorPrice
+			checks <- collection.Name
+		}
 		if err != nil {
-			log.Println(err)
-			return
+			fmt.Println("ERRRRR")
+			fmt.Println(err)
+			break
 		}
-		// print out that message for clarity
-		fmt.Println(string(p))
-
-		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return
-		}
-
+		time.Sleep(2)
 	}
 }
 
-func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Home Page")
-
-}
-
-func setupRoutes() {
-	http.HandleFunc("/", homePage)
-	http.HandleFunc("/ws", wsEndpoint)
+func MonitorIfArbitrage(checks chan string) {
+	for {
+		res, ok := <-checks
+		if ok {
+			fmt.Println(res)
+			add, _ := api.GetOpenSeaCollectionAddress(res)
+			bid, _ := api.GetLooksRareBestBid(add)
+			floor, _ := api.GetOpenSeaFloor(res)
+			if bid != nil {
+				detectArbitrage(*bid, floor)
+			}
+		} else {
+			fmt.Println("ERR")
+			break
+		}
+	}
 }
 
 func main() {
@@ -91,16 +105,23 @@ func main() {
 
 	bid, _ := api.GetLooksRareBestBid(address)
 
-	detectArbitrage(*bid, floorPrice)
-
-	// Create a url.URL to connect to. `ws://` is non-encrypted websocket.
-	urlStr := "wss://testnets-stream.openseabeta.com/socket?token=ae36b1b4131c421e8c84088ad48abe9b&vsn=2.0.0"
-	endPoint, _ := url.Parse(urlStr)
-	log.Println("Connecting to", endPoint)
-	c, resp, err := websocket.DefaultDialer.Dial(urlStr, nil)
-	if err != nil {
-		log.Printf("handshake failed with status %d", resp.StatusCode)
-		log.Fatal("dial:", err)
+	if bid != nil {
+		detectArbitrage(*bid, floorPrice)
 	}
-	_ = c
+	fmt.Println("---------------")
+	fmt.Println("Loading Collections")
+	var collections []Collection
+	collectionNames := []string{"otherdeed", "goblintownwtf"}
+	// add some collection
+	collections = AddCollections(collectionNames, collections)
+	PrintCollections(collections)
+	fmt.Println("Starting to monitor")
+	checks := make(chan string)
+	for i := range collections {
+		go collections[i].MonitorAndUpdateFloorPrice(checks)
+	}
+	fmt.Println("here")
+	MonitorIfArbitrage(checks)
+	PrintCollections(collections)
+
 }
